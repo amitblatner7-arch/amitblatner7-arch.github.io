@@ -264,12 +264,23 @@ async function playTrack(id, again){
       try{ const t=await api("/tracks/"+id+"?market=from_token"); if(t&&t.duration_ms) start=pickStart(t.duration_ms); }catch(e){}
     }
     await api("/me/player/play?device_id="+device.id,{method:"PUT",body:JSON.stringify({uris:["spotify:track:"+id],position_ms:start||0})});
-    if(start===undefined){   // fallback: learn the length from the player, then jump
-      for(let i=0;i<6&&start===undefined;i++){
-        await new Promise(r=>setTimeout(r,250));
-        try{ const p=await api("/me/player"); const d=p&&p.item&&p.item.duration_ms;
-          if(d){ start=pickStart(d); await api("/me/player/seek?position_ms="+start+"&device_id="+device.id,{method:"PUT"}); } }catch(e){}
-      }
+    // confirm audio actually started on this device before showing the 20s countdown —
+    // Spotify can accept the command (204) yet play nothing if the app lost its Connect session
+    let verified=false;
+    for(let i=0;i<8&&!verified;i++){
+      await new Promise(r=>setTimeout(r,350));
+      try{
+        const p=await api("/me/player");
+        if(p&&p.is_playing&&p.device&&p.device.id===device.id){
+          verified=true;
+          if(start===undefined&&p.item&&p.item.duration_ms){ start=pickStart(p.item.duration_ms); await api("/me/player/seek?position_ms="+start+"&device_id="+device.id,{method:"PUT"}); }
+        } else if(start===undefined&&p&&p.item&&p.item.duration_ms){ start=pickStart(p.item.duration_ms); }
+      }catch(e){}
+    }
+    if(!verified){
+      show("home");
+      say("ספוטיפיי קיבל את הפקודה אבל לא באמת ניגן. פתח את אפליקציית ספוטיפיי, נגן שיר לשנייה וחזור לסרוק.","פתח ספוטיפיי",openSpotify);
+      return;
     }
     startCache[id]=start||0;
     schedule();
