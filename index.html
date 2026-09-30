@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ציר הזמן">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>ציר הזמן</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+:root{--ink:#000;--plum:#1A1A1A;--pink:#fff;--violet:#fff;--cyan:#fff;--text:#F2F2F2;--dim:#9A9A9A;
+  --neon:linear-gradient(#fff,#fff)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:Rubik,"Arial Hebrew",Arial,sans-serif;color:var(--text);
+  background:radial-gradient(circle at 50% 38%,var(--plum) 0%,var(--ink) 70%) fixed,var(--ink);
+  padding:env(safe-area-inset-top,0) 20px env(safe-area-inset-bottom,0);-webkit-tap-highlight-color:transparent;
+  -webkit-user-select:none;user-select:none}
+.screen{display:none;min-height:100%;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:28px 0;text-align:center}
+.screen.on{display:flex}
+h1{font-weight:900;font-size:27px;line-height:1.15}
+p{color:var(--dim);font-size:15px;line-height:1.5;max-width:34ch}
+ol{color:var(--dim);font-size:15px;line-height:1.55;text-align:right;max-width:32ch;padding-right:1.2em}
+button{font:inherit;font-weight:700;font-size:17px;color:var(--text);border:0;cursor:pointer;border-radius:14px;padding:15px 22px;
+  background:#141414;box-shadow:inset 0 0 0 1.5px #3A3A3A;min-width:200px}
+button.primary{background:var(--neon);color:#000;box-shadow:none}
+button.link{background:none;box-shadow:none;color:var(--dim);font-weight:500;font-size:15px;padding:8px;min-width:0}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+button:disabled{opacity:.5}
+input,textarea{font:inherit;font-size:16px;width:100%;max-width:340px;padding:14px;border-radius:12px;border:0;background:#111;color:var(--text);
+  box-shadow:inset 0 0 0 1.5px #3A3A3A;direction:ltr;text-align:left;-webkit-user-select:text;user-select:text}
+textarea{height:84px;resize:none;font-size:13px}
+.uri{direction:ltr;font-size:13px;background:#111;padding:10px 12px;border-radius:10px;word-break:break-all;max-width:340px;-webkit-user-select:text;user-select:text}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.ok{font-size:44px;line-height:1;background:var(--neon);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:900}
+.ringbtn{width:220px;height:220px;border-radius:50%;padding:5px;background:var(--neon);box-shadow:none;min-width:0}
+.ringbtn span{display:flex;width:100%;height:100%;border-radius:50%;background:var(--ink);align-items:center;justify-content:center;font-size:24px;font-weight:900}
+#scan{padding:0;justify-content:flex-start}
+.cam{position:relative;width:100%;max-width:480px;aspect-ratio:3/4;border-radius:20px;overflow:hidden;margin-top:12px;background:#000}
+video{width:100%;height:100%;object-fit:cover;display:block}
+.frame{position:absolute;inset:18%;border-radius:18px;box-shadow:0 0 0 2000px rgba(11,10,22,.55);border:3px solid var(--pink)}
+.count{font-size:120px;font-weight:900;line-height:1;background:var(--neon);-webkit-background-clip:text;background-clip:text;color:transparent}
+.disc{width:230px;height:230px;border-radius:50%;position:relative;
+  background:radial-gradient(circle,var(--ink) 0 17%,transparent 18%),repeating-radial-gradient(circle,#1c1c1c 0 3px,#0e0e0e 3px 6px);
+  box-shadow:none}
+.disc::before{content:"";position:absolute;inset:-5px;border-radius:50%;padding:5px;background:var(--neon);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.disc.spin{animation:spin 3.2s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.disc.spin{animation:none}}
+.timer{font-size:22px;font-weight:700;direction:ltr}
+.bar{width:230px;height:4px;border-radius:2px;background:#2A2A2A;overflow:hidden;direction:ltr}.bar i{display:block;height:100%;width:0;background:#fff}
+#msg{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0));left:16px;right:16px;display:none;background:#1A1A1A;
+  box-shadow:inset 0 0 0 1.5px var(--pink);border-radius:12px;padding:13px 16px;font-size:15px;line-height:1.45;text-align:right;z-index:9}
+#msg.on{display:block}
+#msg button{margin-top:10px;min-width:0;padding:10px 16px;font-size:15px}
+</style>
+</head>
+<body>
+
+<!-- Safari, first time: connect Spotify -->
+<section id="setup" class="screen">
+  <h1>חיבור לספוטיפיי</h1>
+  <p>פעם אחת בלבד. אחרי זה כל סריקה של קלף מנגנת מיד.</p>
+  <div class="uri" id="redir" hidden></div><button id="copyRedir" hidden></button>
+  <input id="cid" type="hidden">
+  <button class="primary" id="connect">התחבר לספוטיפיי</button>
+</section>
+
+<!-- Safari, connected: hand the login over to the home-screen app -->
+<section id="paired" class="screen">
+  <div class="ok">✓</div>
+  <h1>מחובר לספוטיפיי</h1>
+  <ol>
+    <li>לחץ "העתק קוד חיבור".</li>
+    <li>בספארי: כפתור השיתוף ← "הוסף למסך הבית".</li>
+    <li>פתח את האייקון החדש ולחץ "הדבק קוד חיבור".</li>
+  </ol>
+  <button class="primary" id="copyCode">העתק קוד חיבור</button>
+  <button class="link" id="playHere">שחק כאן בספארי</button>
+</section>
+
+<!-- Home-screen app, not yet connected -->
+<section id="pair" class="screen">
+  <h1>הדבק קוד חיבור</h1>
+  <p>את הקוד מעתיקים בספארי אחרי ההתחברות לספוטיפיי.</p>
+  <button class="primary" id="pasteCode">הדבק קוד חיבור</button>
+  <textarea id="codeBox" placeholder="או הדבק כאן ידנית" autocapitalize="off" spellcheck="false"></textarea>
+  <button id="useCode">השתמש בקוד</button>
+  <button class="link" id="directLogin">התחבר ישירות מכאן</button>
+</section>
+
+<section id="home" class="screen">
+  <button class="ringbtn" id="goScan"><span>סרוק קלף</span></button>
+  <p id="devInfo">ספוטיפיי צריך להיות פתוח באייפון.</p>
+  <div class="row">
+    <button class="link" id="openSpotify">פתח ספוטיפיי</button>
+    <button class="link" id="goExport">ייצוא פלייליסט</button>
+    <button class="link" id="goInstall">התקנה כאייקון</button>
+  </div>
+</section>
+
+<section id="scan" class="screen">
+  <div class="cam"><video id="video" playsinline muted autoplay></video><div class="frame"></div></div>
+  <p>כוון את הברקוד לתוך המסגרת</p>
+  <button id="cancelScan">ביטול</button>
+  <canvas id="cv" hidden></canvas>
+</section>
+
+
+<section id="playing" class="screen">
+  <div class="disc spin" id="disc"></div>
+  <div class="timer" id="timer">0:20</div>
+  <div class="bar"><i id="clipBar"></i></div>
+  <p id="clipDone" hidden>הקטע הסתיים</p>
+  <div class="row">
+    <button id="toggle" style="min-width:120px">השהה</button>
+    <button id="restart" style="min-width:120px">שוב</button>
+  </div>
+  <button class="primary" id="next">סרוק קלף הבא</button>
+</section>
+
+<section id="testok" class="screen">
+  <div class="ok">✓</div>
+  <h1>קלף בדיקה נקרא</h1>
+  <p id="testInfo"></p>
+  <button class="primary" id="testNext">סרוק עוד</button>
+  <button class="link" id="testHome">חזרה</button>
+</section>
+
+<section id="export" class="screen">
+  <h1>ייצוא פלייליסט</h1>
+  <p>הדבק קישור לפלייליסט. יורד קובץ עם כל השירים, ואותו שולחים ליצירת הקלפים.</p>
+  <input id="plUrl" placeholder="https://open.spotify.com/playlist/..." autocomplete="off" autocapitalize="off">
+  <button class="primary" id="doExport">הורד קובץ</button>
+  <p id="exportStatus"></p>
+  <button class="link" id="backHome">חזרה</button>
+</section>
+
+<div id="msg" role="alert"><div id="msgText"></div><button id="msgBtn" hidden></button></div>
+
+<script>
+const DEFAULT_CID="c30a57fe05984d258c5b3912a620c1fb";
+const SCOPES="user-modify-playback-state user-read-playback-state playlist-read-private playlist-read-collaborative";
+const REDIRECT=location.origin+location.pathname.replace(/index\.html$/,"");
+const STANDALONE=navigator.standalone===true||matchMedia("(display-mode: standalone)").matches;
+const $=id=>document.getElementById(id);
+const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},
+             set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},
+             del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
+function show(id){document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id===id));}
+let msgT;
+function say(t,btnLabel,btnFn){
+  const m=$("msg"),b=$("msgBtn"); $("msgText").textContent=t;
+  if(btnLabel){b.textContent=btnLabel;b.hidden=false;b.onclick=()=>{m.classList.remove("on");btnFn();};}else b.hidden=true;
+  m.classList.add("on");clearTimeout(msgT);msgT=setTimeout(()=>m.classList.remove("on"),btnLabel?12000:6000);
+}
+const openSpotify=()=>{location.href="spotify:";};
+
+/* ---------- auth ---------- */
+const b64u=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+async function authUrl(){
+  const a=new Uint8Array(64);crypto.getRandomValues(a);const verifier=b64u(a).slice(0,96);store.set("verifier",verifier);
+  const challenge=b64u(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier)));
+  return "https://accounts.spotify.com/authorize?"+new URLSearchParams({response_type:"code",client_id:store.get("cid"),scope:SCOPES,
+    code_challenge_method:"S256",code_challenge:challenge,redirect_uri:REDIRECT});
+}
+async function tokenRequest(params){
+  const r=await fetch("https://accounts.spotify.com/api/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams(params)});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){const e=new Error(j.error_description||j.error||"token");e.code=j.error;throw e;}
+  store.set("at",j.access_token); if(j.refresh_token) store.set("rt",j.refresh_token);
+  store.set("exp",String(Date.now()+(j.expires_in-60)*1000));
+}
+function loggedOut(reason){
+  ["at","rt","exp"].forEach(store.del);
+  show(STANDALONE?"pair":"setup");
+  say(reason||"צריך להתחבר מחדש לספוטיפיי.");
+}
+async function token(){
+  if(store.get("at")&&Date.now()<+store.get("exp")) return store.get("at");
+  if(!store.get("rt")) throw Object.assign(new Error("login"),{login:true});
+  try{ await tokenRequest({grant_type:"refresh_token",refresh_token:store.get("rt"),client_id:store.get("cid")}); }
+  catch(e){ if(e.code==="invalid_grant"||e.code==="invalid_client") throw Object.assign(new Error("expired"),{login:true,expired:true}); throw e; }
+  return store.get("at");
+}
+async function api(path,opts={}){
+  const url=path.startsWith("http")?path:"https://api.spotify.com/v1"+path;
+  const r=await fetch(url,{...opts,headers:{Authorization:"Bearer "+await token(),"Content-Type":"application/json"}});
+  if(r.status===204||r.status===202) return null;
+  const j=await r.json().catch(()=>null);
+  if(!r.ok){const e=new Error(j?.error?.message||("HTTP "+r.status));e.status=r.status;e.reason=j?.error?.reason;throw e;}
+  return j;
+}
+function handle(e){
+  if(e.login){ loggedOut(e.expired?"החיבור לספוטיפיי פג תוקף (ספוטיפיי מבקש חיבור מחדש כל חצי שנה). התחבר שוב.":undefined); return; }
+  if(e.reason==="PREMIUM_REQUIRED"){ say("ההשמעה דורשת ספוטיפיי פרימיום בחשבון המחובר."); return; }
+  if(e.status===404||e.reason==="NO_ACTIVE_DEVICE"){ device=null; say("ספוטיפיי לא פעיל באייפון. פתח אותו, נגן משהו לשנייה וחזור לכאן.","פתח ספוטיפיי",openSpotify); return; }
+  if(e.status===403){ say("ספוטיפיי חסם את הבקשה. ודא שהחשבון שלך רשום ב-User Management של אפליקציית המפתחים."); return; }
+  if(e.status===429){ say("ספוטיפיי ביקש להאט. נסה שוב בעוד דקה."); return; }
+  say("שגיאה: "+e.message);
+}
+
+/* pairing code: moves the login from Safari into the home-screen app (iOS keeps their storage separate) */
+const CODE_PREFIX="TZ1:";
+function makeCode(){ return CODE_PREFIX+btoa(JSON.stringify({c:store.get("cid"),r:store.get("rt")})); }
+async function applyCode(raw){
+  const s=(raw||"").trim(); const i=s.indexOf(CODE_PREFIX);
+  if(i<0){ say("זה לא קוד חיבור. העתק אותו שוב בספארי."); return; }
+  try{
+    const o=JSON.parse(atob(s.slice(i+CODE_PREFIX.length).split(/\s/)[0]));
+    store.set("cid",o.c); store.set("rt",o.r); store.del("at"); store.del("exp");
+    await token(); goHome();
+  }catch(e){ if(e.login) loggedOut("הקוד כבר לא בתוקף. התחבר שוב בספארי והעתק קוד חדש."); else say("הקוד לא תקין: "+e.message); }
+}
+
+/* ---------- playback ---------- */
+let device=null;
+async function pickDevice(){
+  const j=await api("/me/player/devices"); const list=j?.devices||[];
+  device=list.find(d=>d.is_active&&d.type==="Smartphone")||list.find(d=>d.type==="Smartphone")||list.find(d=>d.is_active)||list[0]||null;
+  return device;
+}
+/* Hitster-style clip: random start point, 20 seconds, then stop */
+const CLIP_MS=20000;
+const clip={id:null,start:null,remaining:CLIP_MS,endAt:0,timer:null,tick:null,state:"idle"}; // idle|playing|paused|ended
+const startCache={};
+function pickStart(d){                       // random point, away from intro and outro, full 20 s always fits
+  const lo=Math.max(15000,d*0.15), hi=Math.min(d-CLIP_MS-10000,d*0.85-CLIP_MS);
+  return Math.floor(hi>lo ? lo+Math.random()*(hi-lo) : Math.max(0,(d-CLIP_MS)/2));
+}
+function drawClip(){
+  const left=clip.state==="playing"?Math.max(0,clip.endAt-Date.now()):clip.state==="paused"?clip.remaining:clip.state==="ended"?0:CLIP_MS;
+  const sec=Math.ceil(left/1000); $("timer").textContent="0:"+String(sec).padStart(2,"0");
+  $("clipBar").style.width=(100*(CLIP_MS-left)/CLIP_MS)+"%";
+}
+function schedule(){
+  clearTimeout(clip.timer); clearInterval(clip.tick);
+  clip.endAt=Date.now()+clip.remaining; clip.state="playing";
+  clip.timer=setTimeout(endClip,clip.remaining); clip.tick=setInterval(drawClip,200); drawClip();
+  $("toggle").textContent="השהה"; $("toggle").hidden=false; $("disc").classList.add("spin"); $("clipDone").hidden=true;
+}
+async function endClip(){
+  clearTimeout(clip.timer); clearInterval(clip.tick); clip.state="ended"; drawClip();
+  $("disc").classList.remove("spin"); $("toggle").hidden=true; $("clipDone").hidden=false;
+  try{ await api("/me/player/pause?device_id="+device.id,{method:"PUT"}); }catch(e){ if(e.status!==403) handle(e); } // 403 = already paused
+}
+function stopClip(){ clearTimeout(clip.timer); clearInterval(clip.tick); if(clip.state==="playing") api("/me/player/pause?device_id="+device.id,{method:"PUT"}).catch(()=>{}); clip.state="idle"; }
+async function playTrack(id, again){
+  stopClip(); clip.id=id; clip.remaining=CLIP_MS; clip.state="idle"; drawClip();
+  $("disc").classList.remove("spin"); $("toggle").hidden=true; $("clipDone").hidden=true; show("playing");
+  try{
+    if(!device) await pickDevice();
+    if(!device){ show("home"); handle({status:404}); return; }
+    let start=again?startCache[id]:undefined;
+    if(start===undefined){
+      try{ const t=await api("/tracks/"+id+"?market=from_token"); if(t&&t.duration_ms) start=pickStart(t.duration_ms); }catch(e){}
+    }
+    await api("/me/player/play?device_id="+device.id,{method:"PUT",body:JSON.stringify({uris:["spotify:track:"+id],position_ms:start||0})});
+    if(start===undefined){   // fallback: learn the length from the player, then jump
+      for(let i=0;i<6&&start===undefined;i++){
+        await new Promise(r=>setTimeout(r,250));
+        try{ const p=await api("/me/player"); const d=p&&p.item&&p.item.duration_ms;
+          if(d){ start=pickStart(d); await api("/me/player/seek?position_ms="+start+"&device_id="+device.id,{method:"PUT"}); } }catch(e){}
+      }
+    }
+    startCache[id]=start||0;
+    schedule();
+  }catch(e){ show("home"); handle(e); }
+}
+
+/* ---------- scanner ---------- */
+let stream=null,scanning=false,lastBad=0;
+const TRACK_RE=/(?:track[\/:]|[#&?]t=)([A-Za-z0-9]{22})/;
+async function startScan(){
+  show("scan"); scanning=true;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+    const v=$("video"); v.srcObject=stream; await v.play(); requestAnimationFrame(scanLoop);
+  }catch(e){ stopScan(); show("home"); say("אין גישה למצלמה. אשר גישה למצלמה כשהאייפון שואל, או בהגדרות ← ספארי ← מצלמה."); }
+}
+function stopScan(){scanning=false; if(stream){stream.getTracks().forEach(t=>t.stop()); stream=null;}}
+function scanLoop(){
+  if(!scanning) return;
+  const v=$("video"),c=$("cv");
+  if(v.readyState>=2&&v.videoWidth){
+    const k=Math.min(1,720/v.videoWidth); c.width=Math.round(v.videoWidth*k); c.height=Math.round(v.videoHeight*k);
+    const ctx=c.getContext("2d",{willReadFrequently:true}); ctx.drawImage(v,0,0,c.width,c.height);
+    const code=jsQR(ctx.getImageData(0,0,c.width,c.height).data,c.width,c.height,{inversionAttempts:"dontInvert"});
+    if(code){
+      const m=code.data.match(TRACK_RE);
+      if(m){ stopScan();
+        if(m[1].startsWith("TESTCARD")){ $("testInfo").textContent="קלף בדיקה מספר "+parseInt(m[1].slice(8),10)+". הברקוד נקרא תקין."; show("testok"); return; }
+        playTrack(m[1]); return; }
+      if(Date.now()-lastBad>3000){ lastBad=Date.now(); say("הברקוד הזה לא מוביל לשיר בספוטיפיי."); }
+    }
+  }
+  setTimeout(()=>requestAnimationFrame(scanLoop),100);
+}
+
+/* ---------- playlist export ---------- */
+const cell=v=>{v=String(v??"");return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+async function exportPlaylist(){
+  const m=$("plUrl").value.match(/playlist[\/:]([A-Za-z0-9]{22})/);
+  if(!m){ say("זה לא קישור לפלייליסט בספוטיפיי."); return; }
+  const btn=$("doExport"); btn.disabled=true; $("exportStatus").textContent="מושך שירים…";
+  const rows=[["id","title","artist","spotify_release_date","album","url"]];
+  try{
+    let page;
+    try{ page=await api(`/playlists/${m[1]}/items?limit=50`); }
+    catch(e){ if(e.status===404) page=await api(`/playlists/${m[1]}/tracks?limit=50`); else throw e; }
+    while(page){
+      for(const it of page.items||[]){ const t=it.item||it.track; if(!t||t.type!=="track"||!t.id) continue;
+        rows.push([t.id,t.name,(t.artists||[]).map(a=>a.name).join(", "),t.album?.release_date||"",t.album?.name||"","https://open.spotify.com/track/"+t.id]); }
+      $("exportStatus").textContent=`נמשכו ${rows.length-1} שירים…`;
+      page=page.next?await api(page.next):null;
+    }
+    const csv="\uFEFF"+rows.map(r=>r.map(cell).join(",")).join("\n");
+    const file=new File([csv],"playlist.csv",{type:"text/csv"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file]}).catch(()=>{}); }
+    else { const a=document.createElement("a"); a.href=URL.createObjectURL(file); a.download="playlist.csv"; document.body.appendChild(a); a.click(); a.remove(); }
+    $("exportStatus").textContent=`מוכן: ${rows.length-1} שירים.`;
+  }catch(e){ $("exportStatus").textContent=""; handle(e); }
+  btn.disabled=false;
+}
+
+/* ---------- wiring ---------- */
+$("redir").textContent=REDIRECT;
+$("copyRedir").onclick=()=>navigator.clipboard.writeText(REDIRECT).then(()=>say("הכתובת הועתקה."));
+$("connect").onclick=async()=>{ if(!store.get("cid")) store.set("cid",DEFAULT_CID); location.href=await authUrl(); };
+$("copyCode").onclick=()=>navigator.clipboard.writeText(makeCode()).then(()=>say("הקוד הועתק. עכשיו הוסף למסך הבית ופתח משם.")).catch(()=>say("ההעתקה נכשלה. נסה שוב."));
+$("playHere").onclick=goHome;
+$("goInstall").onclick=()=>show("paired");
+$("pasteCode").onclick=async()=>{ try{ applyCode(await navigator.clipboard.readText()); }catch(e){ say("לא הצלחתי לקרוא מהלוח. הדבק ידנית בתיבה."); } };
+$("useCode").onclick=()=>applyCode($("codeBox").value);
+$("directLogin").onclick=()=>{
+  if(!store.get("cid")){ say("קודם צריך להתחבר פעם אחת בספארי."); return; }
+  const w=window.open("about:blank","_blank");           // must open synchronously on tap (iOS keeps it inside the app)
+  authUrl().then(u=>{ if(w) w.location.href=u; else location.href=u; });
+};
+window.addEventListener("message",e=>{ if(e.origin===location.origin&&e.data==="tz-connected") goHome(); });
+$("goScan").onclick=startScan;
+$("cancelScan").onclick=()=>{stopScan();show("home");};
+$("next").onclick=()=>{stopClip();startScan();};
+$("testNext").onclick=startScan; $("testHome").onclick=goHome;
+$("openSpotify").onclick=openSpotify;
+$("toggle").onclick=async()=>{
+  try{
+    if(clip.state==="playing"){ clearTimeout(clip.timer); clearInterval(clip.tick); clip.remaining=Math.max(0,clip.endAt-Date.now()); clip.state="paused";
+      await api("/me/player/pause?device_id="+device.id,{method:"PUT"}); $("toggle").textContent="המשך"; $("disc").classList.remove("spin"); drawClip(); }
+    else if(clip.state==="paused"){ await api("/me/player/play?device_id="+device.id,{method:"PUT"}); schedule(); }
+  }catch(e){ handle(e); }
+};
+$("restart").onclick=()=>{ if(clip.id) playTrack(clip.id,true); };
+$("goExport").onclick=()=>show("export"); $("backHome").onclick=goHome; $("doExport").onclick=exportPlaylist;
+
+let wake=null; async function keepAwake(){ try{ wake=await navigator.wakeLock?.request("screen"); }catch(e){} }
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState!=="visible") return; keepAwake();
+  if(clip.state==="playing"&&Date.now()>=clip.endAt) endClip();   // timers sleep while the screen is off
+  if($("pair").classList.contains("on")&&store.get("rt")) goHome(); });
+
+async function goHome(){
+  show("home");
+  try{ const d=await pickDevice(); $("devInfo").textContent=d?"מתנגן דרך: "+d.name:"ספוטיפיי צריך להיות פתוח באייפון."; }
+  catch(e){ handle(e); }
+}
+
+(async function init(){
+  keepAwake();
+  if(!store.get("cid")) store.set("cid",DEFAULT_CID);
+  if(STANDALONE) $("goInstall").hidden=true;
+  const hm=location.hash.match(/t=([A-Za-z0-9]{22})/);
+  if(hm){ store.set("pending",hm[1]); history.replaceState(null,"",REDIRECT); }
+  const q=new URLSearchParams(location.search);
+  if(q.get("error")){ history.replaceState(null,"",REDIRECT); show(STANDALONE?"pair":"setup"); say("ההתחברות בוטלה."); return; }
+  if(q.get("code")){
+    try{ await tokenRequest({grant_type:"authorization_code",code:q.get("code"),redirect_uri:REDIRECT,client_id:store.get("cid"),code_verifier:store.get("verifier")}); }
+    catch(e){ history.replaceState(null,"",REDIRECT); show(STANDALONE?"pair":"setup"); say("ההתחברות נכשלה: "+e.message); return; }
+    history.replaceState(null,"",REDIRECT);
+    if(window.opener){ try{ window.opener.postMessage("tz-connected",location.origin); }catch(e){} window.close(); }
+  }
+  if(!store.get("rt")){ show(STANDALONE?"pair":"setup"); return; }
+  const pending=store.get("pending");
+  if(pending){ store.del("pending"); if(pending.startsWith("TESTCARD")){ $("testInfo").textContent="קלף בדיקה נקרא תקין."; show("testok"); } else playTrack(pending); return; }
+  goHome();
+})();
+</script>
+</body>
+</html>
